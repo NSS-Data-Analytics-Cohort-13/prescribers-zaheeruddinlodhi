@@ -42,7 +42,7 @@ GROUP BY p.specialty_description
 ORDER BY total_claims DESC
 LIMIT 1;
 
---Q2, Which specialty had the most total number of claims for opioids?
+--Q2, b: Which specialty had the most total number of claims for opioids?
 
 SELECT
           p.specialty_description
@@ -87,7 +87,7 @@ LIMIT 1;
 
 SELECT 
 		  d.generic_name
-		, ROUND(SUM(pp.total_drug_cost)/SUM(total_day_supply),2) AS total_cost_per_day
+		, CAST(ROUND(SUM(pp.total_drug_cost)/SUM(total_day_supply),2) AS money) AS total_cost_per_day
 FROM drug AS d
 INNER JOIN prescription AS pp
 USING(drug_name)
@@ -143,17 +143,37 @@ ORDER BY cbsa_tn DESC
 
 --5, B): Which cbsa has the largest combined population? Which has the smallest? Report the CBSA name and total population.
 
-SELECT 
-		  c.cbsaname
-		, SUM(population) AS total_population
-FROM cbsa AS c
-INNER JOIN fips_county AS f
+-- -- SELECT 
+-- 		  c.cbsaname
+-- 		, SUM(population) AS total_population
+-- FROM cbsa AS c
+-- INNER JOIN fips_county AS f
+-- USING(fipscounty)
+-- INNER JOIN population AS p 
+-- USING(fipscounty)
+-- WHERE state = 'TN'
+-- GROUP BY c.cbsaname
+-- ORDER BY total_population DESC
+
+(
+SELECT cbsaname, SUM(population) AS total_population, 'largest' as flag
+FROM cbsa 
+INNER JOIN population
 USING(fipscounty)
-INNER JOIN population AS p 
-USING(fipscounty)
-WHERE state = 'TN'
-GROUP BY c.cbsaname
+GROUP BY cbsaname
 ORDER BY total_population DESC
+limit 1
+)
+UNION
+(
+SELECT cbsaname, SUM(population) AS total_population, 'smallest' as flag
+FROM cbsa 
+INNER JOIN population
+USING(fipscounty)
+GROUP BY cbsaname
+ORDER BY total_population 
+limit 1
+) order by total_population desc
 
 
 --5, C): What is the largest (in terms of population) county which is not included in a CBSA? Report the county name and population.
@@ -218,36 +238,77 @@ WHERE p.specialty_description = 'Pain Management' AND p.nppes_provider_city = 'N
 
 --7b); Next, report the number of claims per drug per prescriber. Be sure to include all combinations, whether or not the prescriber had any claims. You should report the npi, the drug name, and the number of claims (total_claim_count).
 
-SELECT 
-		    p.npi
-		  , d.drug_name
-		  , p.specialty_description
-		  , p.nppes_provider_city
-		  , d.opioid_drug_flag
-FROM drug AS d
-CROSS JOIN prescriber AS p
-WHERE p.specialty_description = 'Pain Management' AND p.nppes_provider_city = 'NASHVILLE' AND d.opioid_drug_flag = 'Y'
+-- SELECT 
+-- 		    p.npi
+-- 		  , d.drug_name
+-- 		  , p.specialty_description
+-- 		  , p.nppes_provider_city
+-- 		  , d.opioid_drug_flag
+-- FROM drug AS d
+-- CROSS JOIN prescriber AS p
+-- WHERE p.specialty_description = 'Pain Management' AND p.nppes_provider_city = 'NASHVILLE' AND d.opioid_drug_flag = 'Y'
 
---
-	
+SELECT prescriber.npi
+		,	drug.drug_name
+		,	SUM(prescription.total_claim_count) AS sum_total_claims
+	FROM prescriber
+		CROSS JOIN drug
+		LEFT JOIN prescription
+			USING (drug_name)
+	WHERE prescriber.specialty_description = 'Pain Management'
+		AND prescriber.nppes_provider_city = 'NASHVILLE'
+		AND drug.opioid_drug_flag = 'Y'
+	GROUP BY prescriber.npi
+		,	drug.drug_name
+	ORDER BY prescriber.npi;
 
-SELECT *
-FROM zip_fips
---
-SELECT *
-FROM cbsa
 
-SELECT *
-FROM drug
+--7, c. Finally, if you have not done so already, fill in any missing values for total_claim_count with 0. Hint - Google the COALESCE function.__
 
-SELECT *
-FROM fips_county
 
-SELECT *
-FROM overdose_deaths
+SELECT prescriber.npi
+		,	drug.drug_name
+		,	COALESCE(SUM(prescription.total_claim_count), 0) AS sum_total_claims
+	FROM prescriber
+		CROSS JOIN drug
+		LEFT JOIN prescription
+			USING (drug_name)
+	WHERE prescriber.specialty_description = 'Pain Management'
+		AND prescriber.nppes_provider_city = 'NASHVILLE'
+		AND drug.opioid_drug_flag = 'Y'
+	GROUP BY prescriber.npi
+		,	drug.drug_name
+	ORDER BY prescriber.npi;
 
-SELECT *
-FROM prescriber
+---
 
-SELECT *
-FROM prescription
+
+
+-- SELECT DISTINCT npi
+-- 		,	SUM(total_claim_count) as total_claims
+-- 	FROM prescription
+-- 	GROUP BY npi
+-- 	ORDER BY total_claims DESC
+-- 	LIMIT 1;
+
+
+-- SELECT *
+-- FROM zip_fips
+-- --
+-- SELECT *
+-- FROM cbsa
+
+-- SELECT *
+-- FROM drug
+
+-- SELECT *
+-- FROM fips_county
+
+-- SELECT *
+-- FROM overdose_deaths
+
+-- SELECT *
+-- FROM prescriber
+
+-- SELECT *
+-- FROM prescription
